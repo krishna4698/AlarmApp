@@ -15,6 +15,7 @@ import { Weekday } from '../types/alarm';
 import { TimePickerWheel } from '../components/alarm/TimePickerWheel';
 import { DaySelector } from '../components/alarm/DaySelector';
 import { AlarmStorageService } from '../services/alarmStorage';
+import { NativeAlarmService } from '../services/nativeAlarmService';
 
 export const SetAlarmScreen: React.FC<SetAlarmScreenProps> = ({ route, navigation }) => {
   const alarmId = route.params?.alarmId;
@@ -76,7 +77,7 @@ export const SetAlarmScreen: React.FC<SetAlarmScreenProps> = ({ route, navigatio
       return;
     }
 
-    await AlarmStorageService.saveAlarm({
+    const saved = await AlarmStorageService.saveAlarm({
       id: alarmId,
       hour,
       minute,
@@ -85,6 +86,9 @@ export const SetAlarmScreen: React.FC<SetAlarmScreenProps> = ({ route, navigatio
       repeatDays,
       pushUpTarget,
     });
+
+    // Schedule native exact alarm with Android AlarmManager & ForegroundService
+    await NativeAlarmService.scheduleAlarm(saved);
 
     navigation.goBack();
   };
@@ -98,6 +102,7 @@ export const SetAlarmScreen: React.FC<SetAlarmScreenProps> = ({ route, navigatio
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
+          await NativeAlarmService.cancelAlarm(alarmId);
           await AlarmStorageService.deleteAlarm(alarmId);
           navigation.goBack();
         },
@@ -117,7 +122,7 @@ export const SetAlarmScreen: React.FC<SetAlarmScreenProps> = ({ route, navigatio
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView contentContainerStyle={styles.scrollContent} nestedScrollEnabled={true}>
         {/* Header Bar */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>

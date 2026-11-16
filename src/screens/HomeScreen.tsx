@@ -13,6 +13,7 @@ import { Colors, Typography, Spacing } from '../theme';
 import { HomeScreenProps } from '../types/navigation';
 import { Alarm } from '../types/alarm';
 import { AlarmStorageService } from '../services/alarmStorage';
+import { NativeAlarmService } from '../services/nativeAlarmService';
 import { AlarmCard } from '../components/alarm/AlarmCard';
 import {
   formatTime12h,
@@ -44,7 +45,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   );
 
   const handleToggleAlarm = async (alarm: Alarm, isEnabled: boolean) => {
-    await AlarmStorageService.toggleAlarm(alarm.id, isEnabled);
+    const updated = await AlarmStorageService.toggleAlarm(alarm.id, isEnabled);
+    if (updated) {
+      if (isEnabled) {
+        await NativeAlarmService.scheduleAlarm(updated);
+      } else {
+        await NativeAlarmService.cancelAlarm(updated.id);
+      }
+    }
     await loadAlarms();
   };
 
@@ -58,11 +66,26 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            await NativeAlarmService.cancelAlarm(alarm.id);
             await AlarmStorageService.deleteAlarm(alarm.id);
             await loadAlarms();
           },
         },
       ]
+    );
+  };
+
+  const handleTestLiveAlarm = async () => {
+    const targetReps = upcoming?.alarm?.pushUpTarget || 10;
+    const triggerDate = await NativeAlarmService.scheduleQuickTestAlarm(
+      targetReps,
+      'Live Test Push-Up Alarm'
+    );
+
+    Alert.alert(
+      '⏰ Live Alarm Scheduled!',
+      `Alarm will fire at ${triggerDate.toLocaleTimeString()} (in 10 seconds).\n\nYou can lock your phone right now or minimize the app to verify the screen turns on and the alarm rings!`,
+      [{ text: 'Got it!' }]
     );
   };
 
@@ -166,22 +189,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           contentContainerStyle={styles.listContent}
         />
 
-        {/* Floating Bottom Simulator Bar (Previewing Challenge Flow) */}
+        {/* Floating Bottom Bar: Live Trigger & Screen Simulation */}
         <View style={styles.simBar}>
           <TouchableOpacity
-            style={styles.simButton}
+            style={styles.cameraTestButton}
             activeOpacity={0.85}
-            onPress={() => {
-              const active = upcoming?.alarm || alarms[0];
-              navigation.navigate('ActiveAlarm', {
-                alarmId: active?.id || 'demo',
-                pushUpTarget: active?.pushUpTarget || 20,
-                label: active?.label || 'Push-Up Challenge',
-              });
-            }}
+            onPress={() => navigation.navigate('PushUpChallenge', {
+              alarmId: 'camera-test',
+              pushUpTarget: 10,
+            })}
           >
-            <Text style={styles.simButtonText}>
-              ▶ Test Alarm Screen ({upcoming?.alarm.pushUpTarget || 20} Reps)
+            <Text style={styles.cameraTestButtonText}>
+              📷 Test Push-Up Camera & HUD
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.liveAlarmButton}
+            activeOpacity={0.85}
+            onPress={handleTestLiveAlarm}
+          >
+            <Text style={styles.liveAlarmButtonText}>
+              ⚡ Fire Live Alarm in 10s (Test Audio + Screen)
             </Text>
           </TouchableOpacity>
         </View>
@@ -382,21 +411,38 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     padding: Spacing.md,
+    gap: Spacing.xs,
     backgroundColor: 'rgba(13, 15, 20, 0.95)',
     borderTopWidth: 1,
     borderTopColor: Colors.surfaceBorder,
   },
-  simButton: {
+  cameraTestButton: {
     backgroundColor: Colors.surfaceLight,
     paddingVertical: Spacing.sm,
     borderRadius: Spacing.borderRadius.md,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: Colors.cyan,
   },
-  simButtonText: {
+  cameraTestButtonText: {
     ...Typography.bodyBold,
-    color: Colors.primary,
-    fontSize: 14,
+    color: Colors.cyan,
+    fontSize: 13,
+  },
+  liveAlarmButton: {
+    backgroundColor: Colors.primary,
+    paddingVertical: Spacing.sm,
+    borderRadius: Spacing.borderRadius.md,
+    alignItems: 'center',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  liveAlarmButtonText: {
+    ...Typography.bodyBold,
+    color: '#000000',
+    fontSize: 13,
   },
 });

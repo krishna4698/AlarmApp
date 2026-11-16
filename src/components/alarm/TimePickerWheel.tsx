@@ -1,11 +1,126 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+} from 'react-native';
 import { Colors, Typography, Spacing } from '../../theme';
 
 interface TimePickerWheelProps {
   hour: number;   // 0 - 23
   minute: number; // 0 - 59
   onChangeTime: (newHour: number, newMinute: number) => void;
+}
+
+const ITEM_HEIGHT = 48;
+const VISIBLE_COUNT = 3;
+const WHEEL_HEIGHT = ITEM_HEIGHT * VISIBLE_COUNT;
+
+const HOURS = Array.from({ length: 12 }, (_, i) => i + 1); // 1..12
+const MINUTES = Array.from({ length: 60 }, (_, i) => i);   // 0..59
+const PERIODS: ('AM' | 'PM')[] = ['AM', 'PM'];
+
+interface WheelColumnProps<T> {
+  data: T[];
+  selectedIndex: number;
+  onSelect: (index: number) => void;
+  formatItem: (item: T) => string;
+  label: string;
+  width?: number;
+}
+
+function WheelColumn<T>({
+  data,
+  selectedIndex,
+  onSelect,
+  formatItem,
+  label,
+  width = 72,
+}: WheelColumnProps<T>) {
+  const scrollRef = useRef<ScrollView>(null);
+  const isUserScrolling = useRef(false);
+
+  // Sync scroll position whenever selectedIndex changes externally
+  useEffect(() => {
+    if (!isUserScrolling.current && scrollRef.current) {
+      scrollRef.current.scrollTo({
+        y: selectedIndex * ITEM_HEIGHT,
+        animated: true,
+      });
+    }
+  }, [selectedIndex]);
+
+  const handleScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetY = e.nativeEvent.contentOffset.y;
+    const index = Math.max(0, Math.min(data.length - 1, Math.round(offsetY / ITEM_HEIGHT)));
+    isUserScrolling.current = false;
+    if (index !== selectedIndex) {
+      onSelect(index);
+    }
+  };
+
+  const handleItemPress = (index: number) => {
+    scrollRef.current?.scrollTo({
+      y: index * ITEM_HEIGHT,
+      animated: true,
+    });
+    onSelect(index);
+  };
+
+  return (
+    <View style={[styles.columnWrapper, { width }]}>
+      <Text style={styles.wheelHeaderLabel}>{label}</Text>
+      <View style={styles.wheelContainer}>
+        <ScrollView
+          ref={scrollRef}
+          showsVerticalScrollIndicator={false}
+          snapToInterval={ITEM_HEIGHT}
+          decelerationRate="fast"
+          bounces={false}
+          nestedScrollEnabled={true}
+          contentContainerStyle={{
+            paddingVertical: ITEM_HEIGHT, // Leaves space so 1st and last items center
+          }}
+          onScrollBeginDrag={() => {
+            isUserScrolling.current = true;
+          }}
+          onMomentumScrollEnd={handleScrollEnd}
+          onScrollEndDrag={(e) => {
+            setTimeout(() => {
+              if (isUserScrolling.current) {
+                handleScrollEnd(e);
+              }
+            }, 100);
+          }}
+        >
+          {data.map((item, index) => {
+            const isSelected = index === selectedIndex;
+            return (
+              <TouchableOpacity
+                key={`${label}-${index}`}
+                activeOpacity={0.7}
+                style={[styles.itemBox, isSelected && styles.itemBoxSelected]}
+                onPress={() => handleItemPress(index)}
+              >
+                <Text
+                  style={[
+                    styles.itemText,
+                    isSelected ? styles.itemTextSelected : styles.itemTextMuted,
+                  ]}
+                >
+                  {formatItem(item)}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+    </View>
+  );
 }
 
 export const TimePickerWheel: React.FC<TimePickerWheelProps> = ({
@@ -17,106 +132,80 @@ export const TimePickerWheel: React.FC<TimePickerWheelProps> = ({
   let hour12 = hour % 12;
   if (hour12 === 0) hour12 = 12;
 
-  const handleHourStep = (delta: number) => {
-    let nextH12 = hour12 + delta;
-    if (nextH12 > 12) nextH12 = 1;
-    if (nextH12 < 1) nextH12 = 12;
+  const hourIndex = hour12 - 1;
+  const minuteIndex = minute;
+  const periodIndex = isPM ? 1 : 0;
 
-    let new24H = nextH12;
-    if (isPM && nextH12 < 12) new24H += 12;
-    if (!isPM && nextH12 === 12) new24H = 0;
-
+  const handleHourSelect = (newHIndex: number) => {
+    const selectedH12 = HOURS[newHIndex];
+    let new24H = selectedH12;
+    if (isPM && selectedH12 < 12) new24H += 12;
+    if (!isPM && selectedH12 === 12) new24H = 0;
     onChangeTime(new24H, minute);
   };
 
-  const handleMinuteStep = (delta: number) => {
-    let nextM = minute + delta;
-    if (nextM >= 60) nextM = 0;
-    if (nextM < 0) nextM = 55;
-    onChangeTime(hour, nextM);
+  const handleMinuteSelect = (newMIndex: number) => {
+    onChangeTime(hour, MINUTES[newMIndex]);
   };
 
-  const togglePeriod = (targetPM: boolean) => {
+  const handlePeriodSelect = (newPIndex: number) => {
+    const targetPM = newPIndex === 1;
     if (targetPM === isPM) return;
     const new24H = targetPM ? (hour % 12) + 12 : hour % 12;
     onChangeTime(new24H, minute);
   };
 
-  const formattedHour = hour12 < 10 ? `0${hour12}` : `${hour12}`;
-  const formattedMinute = minute < 10 ? `0${minute}` : `${minute}`;
-
   return (
     <View style={styles.card}>
-      <Text style={styles.cardLabel}>ALARM TIME</Text>
-
-      <View style={styles.pickerRow}>
-        {/* Hour Column */}
-        <View style={styles.column}>
-          <TouchableOpacity
-            style={styles.stepButton}
-            onPress={() => handleHourStep(1)}
-          >
-            <Text style={styles.stepIcon}>▲</Text>
-          </TouchableOpacity>
-
-          <View style={styles.numberBox}>
-            <Text style={styles.numberText}>{formattedHour}</Text>
-            <Text style={styles.unitLabel}>HOUR</Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.stepButton}
-            onPress={() => handleHourStep(-1)}
-          >
-            <Text style={styles.stepIcon}>▼</Text>
-          </TouchableOpacity>
-        </View>
-
-        <Text style={styles.colon}>:</Text>
-
-        {/* Minute Column */}
-        <View style={styles.column}>
-          <TouchableOpacity
-            style={styles.stepButton}
-            onPress={() => handleMinuteStep(5)}
-          >
-            <Text style={styles.stepIcon}>▲</Text>
-          </TouchableOpacity>
-
-          <View style={styles.numberBox}>
-            <Text style={styles.numberText}>{formattedMinute}</Text>
-            <Text style={styles.unitLabel}>MIN</Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.stepButton}
-            onPress={() => handleMinuteStep(-5)}
-          >
-            <Text style={styles.stepIcon}>▼</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* AM / PM Toggle */}
-        <View style={styles.periodColumn}>
-          <TouchableOpacity
-            style={[styles.periodButton, !isPM && styles.periodButtonActive]}
-            onPress={() => togglePeriod(false)}
-          >
-            <Text style={[styles.periodText, !isPM && styles.periodTextActive]}>
-              AM
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.periodButton, isPM && styles.periodButtonActive]}
-            onPress={() => togglePeriod(true)}
-          >
-            <Text style={[styles.periodText, isPM && styles.periodTextActive]}>
-              PM
-            </Text>
-          </TouchableOpacity>
-        </View>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardLabel}>SCROLL TO SET TIME</Text>
+        <Text style={styles.previewTimeText}>
+          {hour12 < 10 ? `0${hour12}` : hour12}:{minute < 10 ? `0${minute}` : minute}{' '}
+          <Text style={styles.previewPeriodText}>{isPM ? 'PM' : 'AM'}</Text>
+        </Text>
       </View>
+
+      <View style={styles.pickerContainer}>
+        {/* Center Selection Indicator Banner */}
+        <View style={styles.centerSelectionBanner} pointerEvents="none" />
+
+        {/* Scrollable Hour Wheel */}
+        <WheelColumn
+          label="HOUR"
+          data={HOURS}
+          selectedIndex={hourIndex}
+          onSelect={handleHourSelect}
+          formatItem={(h) => (h < 10 ? `0${h}` : `${h}`)}
+          width={76}
+        />
+
+        {/* Separator Colon */}
+        <View style={styles.colonContainer}>
+          <Text style={styles.colon}>:</Text>
+        </View>
+
+        {/* Scrollable Minute Wheel */}
+        <WheelColumn
+          label="MINUTE"
+          data={MINUTES}
+          selectedIndex={minuteIndex}
+          onSelect={handleMinuteSelect}
+          formatItem={(m) => (m < 10 ? `0${m}` : `${m}`)}
+          width={76}
+        />
+
+        {/* Scrollable AM / PM Wheel */}
+        <WheelColumn
+          label="PERIOD"
+          data={PERIODS}
+          selectedIndex={periodIndex}
+          onSelect={handlePeriodSelect}
+          formatItem={(p) => p}
+          width={68}
+        />
+      </View>
+
+      <Text style={styles.scrollTip}>↕ Swipe columns up or down to set alarm time</Text>
     </View>
   );
 };
@@ -125,85 +214,107 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.surface,
     borderRadius: Spacing.borderRadius.lg,
-    padding: Spacing.lg,
-    alignItems: 'center',
+    padding: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.surfaceBorder,
+    marginBottom: Spacing.md,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
   },
   cardLabel: {
     ...Typography.caption,
-    color: Colors.primary,
+    color: Colors.textSecondary,
     letterSpacing: 1.5,
     fontWeight: '700',
-    marginBottom: Spacing.md,
   },
-  pickerRow: {
+  previewTimeText: {
+    ...Typography.bodyBold,
+    color: Colors.primary,
+    fontSize: 16,
+  },
+  previewPeriodText: {
+    fontSize: 13,
+    color: Colors.primaryLight,
+  },
+  pickerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.md,
+    height: WHEEL_HEIGHT,
+    position: 'relative',
+    marginVertical: Spacing.xs,
   },
-  column: {
-    alignItems: 'center',
-  },
-  stepButton: {
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.md,
-  },
-  stepIcon: {
-    fontSize: 16,
-    color: Colors.primaryLight,
-  },
-  numberBox: {
-    backgroundColor: Colors.surfaceLight,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
+  centerSelectionBanner: {
+    position: 'absolute',
+    top: ITEM_HEIGHT,
+    left: 8,
+    right: 8,
+    height: ITEM_HEIGHT,
     borderRadius: Spacing.borderRadius.md,
-    minWidth: 80,
+    backgroundColor: 'rgba(255, 149, 0, 0.08)',
+    borderTopWidth: 1.5,
+    borderBottomWidth: 1.5,
+    borderColor: 'rgba(255, 149, 0, 0.45)',
+  },
+  columnWrapper: {
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.surfaceBorder,
   },
-  numberText: {
-    ...Typography.hero,
-    fontSize: 48,
-    color: Colors.textPrimary,
-  },
-  unitLabel: {
+  wheelHeaderLabel: {
     ...Typography.caption,
-    color: Colors.textMuted,
     fontSize: 10,
+    color: Colors.textMuted,
+    fontWeight: '800',
     letterSpacing: 1,
+    marginBottom: 2,
+  },
+  wheelContainer: {
+    height: WHEEL_HEIGHT,
+    width: '100%',
+  },
+  itemBox: {
+    height: ITEM_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  itemBoxSelected: {
+    // Center selected
+  },
+  itemText: {
+    ...Typography.hero,
+    textAlign: 'center',
+  },
+  itemTextSelected: {
+    fontSize: 32,
+    color: Colors.textPrimary,
+    fontWeight: '800',
+  },
+  itemTextMuted: {
+    fontSize: 20,
+    color: Colors.textMuted,
+    fontWeight: '500',
+    opacity: 0.45,
+  },
+  colonContainer: {
+    height: WHEEL_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    paddingTop: 16,
   },
   colon: {
-    ...Typography.hero,
-    fontSize: 40,
+    fontSize: 32,
+    fontWeight: '800',
     color: Colors.primary,
-    marginTop: -Spacing.sm,
   },
-  periodColumn: {
-    backgroundColor: Colors.surfaceLight,
-    borderRadius: Spacing.borderRadius.md,
-    padding: 3,
-    borderWidth: 1,
-    borderColor: Colors.surfaceBorder,
-    gap: 4,
-    marginLeft: Spacing.xs,
-  },
-  periodButton: {
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    borderRadius: Spacing.borderRadius.sm,
-  },
-  periodButtonActive: {
-    backgroundColor: Colors.primary,
-  },
-  periodText: {
-    ...Typography.bodyBold,
-    color: Colors.textSecondary,
-    fontSize: 13,
-  },
-  periodTextActive: {
-    color: '#000000',
+  scrollTip: {
+    ...Typography.caption,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    marginTop: Spacing.sm,
+    fontSize: 11,
   },
 });

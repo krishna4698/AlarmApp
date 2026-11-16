@@ -3,12 +3,14 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing } from '../theme';
 import { ChallengeCompletedScreenProps } from '../types/navigation';
+import { NativeAlarmService } from '../services/nativeAlarmService';
 
 export const ChallengeCompletedScreen: React.FC<ChallengeCompletedScreenProps> = ({ route, navigation }) => {
-  const { completedReps = 20 } = route.params || {};
+  const { completedReps = 20, alarmId = 'demo' } = route.params || {};
 
-  const handleStopAlarm = () => {
-    // In Milestone 4 & 8, this will invoke AlarmService.stopAlarmAudio()
+  const handleStopAlarm = async () => {
+    // Stops the native Android foreground service and audio playback
+    await NativeAlarmService.stopAlarm(alarmId);
     navigation.reset({
       index: 0,
       routes: [{ name: 'Home' }],

@@ -3,9 +3,10 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing } from '../theme';
 import { ActiveAlarmScreenProps } from '../types/navigation';
+import { NativeAlarmService } from '../services/nativeAlarmService';
 
 export const ActiveAlarmScreen: React.FC<ActiveAlarmScreenProps> = ({ route, navigation }) => {
-  const { pushUpTarget = 20, label = 'Morning Alarm' } = route.params || {};
+  const { alarmId = 'demo', pushUpTarget = 20, label = 'Morning Alarm' } = route.params || {};
 
   const handleEmergencyDismiss = () => {
     Alert.alert(
@@ -13,7 +14,14 @@ export const ActiveAlarmScreen: React.FC<ActiveAlarmScreenProps> = ({ route, nav
       'Are you sure you want to bypass the push-up challenge? Use this only for emergencies.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Bypass Alarm', style: 'destructive', onPress: () => navigation.navigate('Home') },
+        {
+          text: 'Bypass Alarm',
+          style: 'destructive',
+          onPress: async () => {
+            await NativeAlarmService.stopAlarm(alarmId);
+            navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+          },
+        },
       ]
     );
   };
