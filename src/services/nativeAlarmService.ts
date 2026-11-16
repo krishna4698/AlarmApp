@@ -10,6 +10,7 @@ import { Platform } from 'react-native';
 import { Alarm } from '../types/alarm';
 import { calculateNextTrigger } from '../utils/timeUtils';
 import { AlarmStorageService } from './alarmStorage';
+import { VolumeLockService } from './volumeLockService';
 
 export const ALARM_CHANNEL_ID = 'pushup_alarm_channel_v2';
 
@@ -221,7 +222,11 @@ export class NativeAlarmService {
    */
   static async stopAlarm(alarmId: string): Promise<void> {
     try {
-      // 1. Terminate foreground service to kill alarm audio
+      // 1. Release hardware volume button lock & stop native MediaPlayer
+      VolumeLockService.stopAlarmSound();
+      VolumeLockService.unlock();
+
+      // 2. Terminate foreground service to kill alarm audio
       await notifee.stopForegroundService();
 
       // 2. Clear the ringing notification

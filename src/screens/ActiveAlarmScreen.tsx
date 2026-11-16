@@ -1,12 +1,18 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing } from '../theme';
 import { ActiveAlarmScreenProps } from '../types/navigation';
 import { NativeAlarmService } from '../services/nativeAlarmService';
+import { VolumeLockService } from '../services/volumeLockService';
 
 export const ActiveAlarmScreen: React.FC<ActiveAlarmScreenProps> = ({ route, navigation }) => {
   const { alarmId = 'demo', pushUpTarget = 20, label = 'Morning Alarm' } = route.params || {};
+
+  // Start dedicated un-mutable alarm MediaPlayer & lock volume buttons
+  useEffect(() => {
+    VolumeLockService.startAlarmSound();
+  }, []);
 
   const handleEmergencyDismiss = () => {
     Alert.alert(
@@ -18,6 +24,7 @@ export const ActiveAlarmScreen: React.FC<ActiveAlarmScreenProps> = ({ route, nav
           text: 'Bypass Alarm',
           style: 'destructive',
           onPress: async () => {
+            VolumeLockService.stopAlarmSound();
             await NativeAlarmService.stopAlarm(alarmId);
             navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
           },

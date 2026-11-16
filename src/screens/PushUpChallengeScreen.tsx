@@ -16,6 +16,7 @@ import {
 import { Colors, Typography, Spacing } from '../theme';
 import { PushUpChallengeScreenProps } from '../types/navigation';
 import { NativeAlarmService } from '../services/nativeAlarmService';
+import { VolumeLockService } from '../services/volumeLockService';
 
 export const PushUpChallengeScreen: React.FC<PushUpChallengeScreenProps> = ({
   route,
@@ -30,6 +31,13 @@ export const PushUpChallengeScreen: React.FC<PushUpChallengeScreenProps> = ({
   const [torchEnabled, setTorchEnabled] = useState(false);
 
   const device = useCameraDevice(cameraPosition);
+
+  // Keep dedicated un-mutable alarm sound playing & volume buttons locked
+  useEffect(() => {
+    if (alarmId && alarmId !== 'camera-test') {
+      VolumeLockService.startAlarmSound();
+    }
+  }, [alarmId]);
 
   // Auto-request permission on mount if not yet granted
   useEffect(() => {
@@ -56,7 +64,8 @@ export const PushUpChallengeScreen: React.FC<PushUpChallengeScreenProps> = ({
 
   // Completion Handler
   const handleChallengeSuccess = async (finalReps: number) => {
-    // Silence the alarm foreground service immediately
+    // 1. Release volume lock and silence alarm MediaPlayer
+    VolumeLockService.stopAlarmSound();
     await NativeAlarmService.stopAlarm(alarmId || 'quick-test');
 
     navigation.replace('ChallengeCompleted', {
