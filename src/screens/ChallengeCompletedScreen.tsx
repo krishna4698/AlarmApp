@@ -25,23 +25,23 @@ export const ChallengeCompletedScreen: React.FC<ChallengeCompletedScreenProps> =
           <View style={styles.successBadge}>
             <Text style={styles.checkIcon}>✓</Text>
           </View>
-          <Text style={styles.title}>CHALLENGE COMPLETED!</Text>
+          <Text style={styles.title}>ALARM SILENCED!</Text>
           <Text style={styles.subtitle}>
             Great job! You crushed all <Text style={styles.highlightReps}>{completedReps} push-ups</Text>.
           </Text>
           <Text style={styles.desc}>
-            You have successfully proved you are awake. You may now silence your alarm.
+            Your alarm is off and volume controls have been restored. You're wide awake and ready to crush the day!
           </Text>
         </View>
 
-        {/* Unlocked Stop Alarm Button */}
+        {/* Finish & Return Home Button */}
         <View style={styles.bottomSection}>
           <TouchableOpacity
             style={styles.stopAlarmButton}
             activeOpacity={0.85}
             onPress={handleStopAlarm}
           >
-            <Text style={styles.stopAlarmText}>STOP ALARM</Text>
+            <Text style={styles.stopAlarmText}>GOOD MORNING! (FINISH)</Text>
           </TouchableOpacity>
         </View>
       </View>

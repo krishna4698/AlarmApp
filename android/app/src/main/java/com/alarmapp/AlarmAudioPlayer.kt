@@ -9,30 +9,39 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 
+/**
+ * Dedicated looping alarm audio engine running on USAGE_ALARM.
+ * Pairs with a system ContentObserver to prevent muting or lowering volume
+ * from the lock screen or background.
+ */
 object AlarmAudioPlayer {
     private var mediaPlayer: MediaPlayer? = null
     private var volumeObserver: ContentObserver? = null
     private var appContext: Context? = null
     private const val TAG = "AlarmAudioPlayer"
 
+    private fun enforceMaxAlarmVolume(audioManager: AudioManager) {
+        val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+        val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
+        if (currentVol < maxVol) {
+            audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxVol, 0)
+        }
+    }
+
     @Synchronized
     fun play(context: Context) {
         val targetContext = context.applicationContext ?: context
         appContext = targetContext
 
-        // 1. Force max alarm stream volume
         val audioManager = targetContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
         try {
-            audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxVol, 0)
+            enforceMaxAlarmVolume(audioManager)
         } catch (e: Exception) {
             Log.e(TAG, "Error setting max alarm volume", e)
         }
 
-        // 2. Register system volume observer to enforce max volume even in background
         registerVolumeLockObserver(targetContext, audioManager)
 
-        // 3. If already playing, keep playing
         if (mediaPlayer != null && isPlaying()) {
             Log.d(TAG, "Alarm MediaPlayer already playing")
             return
@@ -68,11 +77,8 @@ object AlarmAudioPlayer {
             override fun onChange(selfChange: Boolean) {
                 super.onChange(selfChange)
                 try {
-                    val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
-                    val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
-                    if (currentVol < maxVol && isPlaying()) {
-                        Log.d(TAG, "Volume change detected! Resetting to max ($maxVol)")
-                        audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxVol, 0)
+                    if (isPlaying()) {
+                        enforceMaxAlarmVolume(audioManager)
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error enforcing volume in observer", e)

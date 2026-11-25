@@ -66,12 +66,12 @@ class PoseCameraView(context: Context) : FrameLayout(context) {
             val jitter = deltaX + deltaY + deltaZ
             val now = System.currentTimeMillis()
 
-            // Phone is being moved/handled in hand (jitter > 1.2 m/s²)
-            if (jitter > 1.2f) {
+            // Phone is being moved/handled in hand
+            if (jitter > JITTER_THRESHOLD) {
                 lastMovementTime = now
                 isDeviceStationary = false
-            } else if (now - lastMovementTime > 600) {
-                // Device resting still on floor/surface for > 600ms
+            } else if (now - lastMovementTime > STATIONARY_SETTLE_MS) {
+                // Device resting still on floor/surface
                 isDeviceStationary = true
             }
         }
@@ -86,6 +86,8 @@ class PoseCameraView(context: Context) : FrameLayout(context) {
 
     companion object {
         private const val TAG = "PoseCameraView"
+        private const val JITTER_THRESHOLD = 1.2f
+        private const val STATIONARY_SETTLE_MS = 600L
     }
 
     private val mLayoutRunnable = Runnable {

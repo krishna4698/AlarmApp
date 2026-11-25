@@ -17,6 +17,17 @@ import { DaySelector } from '../components/alarm/DaySelector';
 import { AlarmStorageService } from '../services/alarmStorage';
 import { NativeAlarmService } from '../services/nativeAlarmService';
 
+type DayPresetKey = 'all' | 'weekdays' | 'weekends' | 'none';
+
+const DAY_PRESETS: Record<DayPresetKey, Weekday[]> = {
+  all: [0, 1, 2, 3, 4, 5, 6],
+  weekdays: [1, 2, 3, 4, 5],
+  weekends: [0, 6],
+  none: [],
+};
+
+const REP_PRESETS = [10, 15, 20, 25, 30, 40];
+
 export const SetAlarmScreen: React.FC<SetAlarmScreenProps> = ({ route, navigation }) => {
   const alarmId = route.params?.alarmId;
   const isEditing = Boolean(alarmId);
@@ -54,21 +65,8 @@ export const SetAlarmScreen: React.FC<SetAlarmScreenProps> = ({ route, navigatio
     }
   };
 
-  const handlePresetDays = (preset: 'all' | 'weekdays' | 'weekends' | 'none') => {
-    switch (preset) {
-      case 'all':
-        setRepeatDays([0, 1, 2, 3, 4, 5, 6]);
-        break;
-      case 'weekdays':
-        setRepeatDays([1, 2, 3, 4, 5]);
-        break;
-      case 'weekends':
-        setRepeatDays([0, 6]);
-        break;
-      case 'none':
-        setRepeatDays([]);
-        break;
-    }
+  const handlePresetDays = (preset: DayPresetKey) => {
+    setRepeatDays(DAY_PRESETS[preset]);
   };
 
   const handleSave = async () => {
@@ -177,7 +175,7 @@ export const SetAlarmScreen: React.FC<SetAlarmScreenProps> = ({ route, navigatio
 
           {/* Quick Preset Buttons */}
           <View style={styles.targetPresets}>
-            {[10, 15, 20, 25, 30, 40].map((preset) => (
+            {REP_PRESETS.map((preset) => (
               <TouchableOpacity
                 key={preset}
                 style={[

@@ -61,7 +61,7 @@ export const ActiveAlarmScreen: React.FC<ActiveAlarmScreenProps> = ({ route, nav
             style={styles.startChallengeButton}
             activeOpacity={0.85}
             onPress={() => navigation.navigate('PushUpChallenge', {
-              alarmId: route.params?.alarmId || 'demo',
+              alarmId,
               pushUpTarget,
             })}
           >
